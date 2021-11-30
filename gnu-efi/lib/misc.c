@@ -98,7 +98,7 @@ ZeroMem (
     RtZeroMem (Buffer, Size);
 }
 
-VOID EFIAPI
+VOID
 SetMem (
     IN VOID     *Buffer,
     IN UINTN    Size,
@@ -108,10 +108,10 @@ SetMem (
     RtSetMem (Buffer, Size, Value);
 }
 
-VOID EFIAPI
+VOID
 CopyMem (
     IN VOID     *Dest,
-    IN VOID     *Src,
+    IN CONST VOID     *Src,
     IN UINTN    len
     )
 {

@@ -70,29 +70,21 @@ SECTIONS
   .rodata :
   {
     _rodata = .;
-    *(.rodata*)
-    *(.srodata)
-    . = ALIGN(16);
-    *(.note.gnu.build-id)
-    . = ALIGN(4096);
-    *(.vendor_cert)
-    *(.data.ident)
-    . = ALIGN(4096);
-  }
-  . = ALIGN(4096);
-  .rela :
-  {
     *(.rela.dyn)
     *(.rela.plt)
     *(.rela.got)
     *(.rela.data)
     *(.rela.data*)
-  }
-  . = ALIGN(4096);
-  .dyn :
-  {
+
+    *(.rodata*)
+    *(.srodata)
     *(.dynsym)
     *(.dynstr)
+    . = ALIGN(16);
+    *(.note.gnu.build-id)
+    . = ALIGN(4096);
+    *(.vendor_cert)
+    *(.data.ident)
     _evrodata = .;
     . = ALIGN(4096);
   }

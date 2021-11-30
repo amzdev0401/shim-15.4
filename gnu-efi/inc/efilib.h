@@ -272,17 +272,17 @@ ZeroMem (
     IN UINTN     Size
     );
 
-VOID EFIAPI
+VOID
 SetMem (
     IN VOID     *Buffer,
     IN UINTN    Size,
     IN UINT8    Value
     );
 
-VOID EFIAPI
+VOID
 CopyMem (
     IN VOID     *Dest,
-    IN VOID     *Src,
+    IN CONST VOID     *Src,
     IN UINTN    len
     );
 

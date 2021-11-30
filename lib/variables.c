@@ -12,10 +12,6 @@
  */
 #include "shim.h"
 
-extern EFI_SYSTEM_TABLE *ST;
-extern EFI_BOOT_SERVICES *BS;
-extern EFI_RUNTIME_SERVICES *RT;
-
 EFI_STATUS
 fill_esl(const EFI_SIGNATURE_DATA *first_sig, const size_t howmany,
 	 const EFI_GUID *type, const UINT32 sig_size,
@@ -49,7 +45,7 @@ fill_esl(const EFI_SIGNATURE_DATA *first_sig, const size_t howmany,
 	sl->SignatureListSize = needed;
 
 	sd = (EFI_SIGNATURE_DATA *)(out + sizeof(EFI_SIGNATURE_LIST));
-	CopyMem(sd, (void *)first_sig, data_len);
+	CopyMem(sd, first_sig, data_len);
 
 	return EFI_SUCCESS;
 }
@@ -69,8 +65,8 @@ fill_esl_with_one_signature(const uint8_t *data, const uint32_t data_len,
 	if (out) {
 		sd = AllocateZeroPool(sig_size);
 		if (owner)
-			CopyMem(sd, (void *)owner, sizeof(EFI_GUID));
-		CopyMem(sd->SignatureData, (void *)data, data_len);
+			CopyMem(sd, owner, sizeof(EFI_GUID));
+		CopyMem(sd->SignatureData, data, data_len);
 	}
 
 	efi_status = fill_esl(sd, 1, type, sig_size, out, outlen);
@@ -158,7 +154,7 @@ CreateTimeBasedPayload(IN OUT UINTN * DataSize, IN OUT UINT8 ** Data)
 	DescriptorData = (EFI_VARIABLE_AUTHENTICATION_2 *) (NewData);
 
 	ZeroMem(&Time, sizeof(EFI_TIME));
-	efi_status = RT->GetTime(&Time, NULL);
+	efi_status = gRT->GetTime(&Time, NULL);
 	if (EFI_ERROR(efi_status)) {
 		FreePool(NewData);
 		return efi_status;
@@ -229,7 +225,7 @@ SetSecureVariable(const CHAR16 * const var, UINT8 *Data, UINTN len,
 		return efi_status;
 	}
 
-	efi_status = RT->SetVariable((CHAR16 *)var, &owner,
+	efi_status = gRT->SetVariable((CHAR16 *)var, &owner,
 			EFI_VARIABLE_NON_VOLATILE |
 			EFI_VARIABLE_RUNTIME_ACCESS |
 			EFI_VARIABLE_BOOTSERVICE_ACCESS |
@@ -245,8 +241,8 @@ GetOSIndications(void)
 	UINTN DataSize = sizeof(indications);
 	EFI_STATUS efi_status;
 
-	efi_status = RT->GetVariable(L"OsIndicationsSupported", &GV_GUID,
-				     NULL, &DataSize, &indications);
+	efi_status = gRT->GetVariable(L"OsIndicationsSupported", &GV_GUID,
+				      NULL, &DataSize, &indications);
 	if (EFI_ERROR(efi_status))
 		return 0;
 
@@ -259,15 +255,15 @@ SETOSIndicationsAndReboot(UINT64 indications)
 	UINTN DataSize = sizeof(indications);
 	EFI_STATUS efi_status;
 
-	efi_status = RT->SetVariable(L"OsIndications", &GV_GUID,
-				     EFI_VARIABLE_NON_VOLATILE |
-				     EFI_VARIABLE_RUNTIME_ACCESS |
-				     EFI_VARIABLE_BOOTSERVICE_ACCESS,
-				     DataSize, &indications);
+	efi_status = gRT->SetVariable(L"OsIndications", &GV_GUID,
+				      EFI_VARIABLE_NON_VOLATILE |
+				      EFI_VARIABLE_RUNTIME_ACCESS |
+				      EFI_VARIABLE_BOOTSERVICE_ACCESS,
+				      DataSize, &indications);
 	if (EFI_ERROR(efi_status))
 		return efi_status;
 
-	RT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
+	gRT->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, NULL);
 	/* does not return */
 
 	return EFI_SUCCESS;
@@ -284,7 +280,7 @@ get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
 
 	*len = 0;
 
-	efi_status = RT->GetVariable((CHAR16 *)var, &owner, NULL, len, NULL);
+	efi_status = gRT->GetVariable((CHAR16 *)var, &owner, NULL, len, NULL);
 	if (efi_status != EFI_BUFFER_TOO_SMALL) {
 		if (!EFI_ERROR(efi_status)) /* this should never happen */
 			return EFI_PROTOCOL_ERROR;
@@ -302,7 +298,7 @@ get_variable_attr(const CHAR16 * const var, UINT8 **data, UINTN *len,
 	if (!*data)
 		return EFI_OUT_OF_RESOURCES;
 
-	efi_status = RT->GetVariable((CHAR16 *)var, &owner, attributes, len, *data);
+	efi_status = gRT->GetVariable((CHAR16 *)var, &owner, attributes, len, *data);
 	if (EFI_ERROR(efi_status)) {
 		FreePool(*data);
 		*data = NULL;
@@ -345,7 +341,7 @@ EFI_STATUS
 set_variable(CHAR16 *var, EFI_GUID owner, UINT32 attributes,
 	     UINTN datasize, void *data)
 {
-	return RT->SetVariable(var, &owner, attributes, datasize, data);
+	return gRT->SetVariable(var, &owner, attributes, datasize, data);
 }
 
 EFI_STATUS
@@ -398,8 +394,8 @@ variable_is_setupmode(int default_return)
 	UINTN DataSize = sizeof(SetupMode);
 	EFI_STATUS efi_status;
 
-	efi_status = RT->GetVariable(L"SetupMode", &GV_GUID, NULL,
-				     &DataSize, &SetupMode);
+	efi_status = gRT->GetVariable(L"SetupMode", &GV_GUID, NULL,
+				      &DataSize, &SetupMode);
 	if (EFI_ERROR(efi_status))
 		return default_return;
 
@@ -415,8 +411,8 @@ variable_is_secureboot(void)
 	EFI_STATUS efi_status;
 
 	DataSize = sizeof(SecureBoot);
-	efi_status = RT->GetVariable(L"SecureBoot", &GV_GUID, NULL,
-				     &DataSize, &SecureBoot);
+	efi_status = gRT->GetVariable(L"SecureBoot", &GV_GUID, NULL,
+				      &DataSize, &SecureBoot);
 	if (EFI_ERROR(efi_status))
 		return 0;
 
@@ -449,10 +445,10 @@ variable_enroll_hash(const CHAR16 * const var, EFI_GUID owner,
 		efi_status = SetSecureVariable(var, sig, sizeof(sig), owner,
 					       EFI_VARIABLE_APPEND_WRITE, 0);
 	else
-		efi_status = RT->SetVariable((CHAR16 *)var, &owner,
-					     EFI_VARIABLE_NON_VOLATILE |
-					     EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					     EFI_VARIABLE_APPEND_WRITE,
-					     sizeof(sig), sig);
+		efi_status = gRT->SetVariable((CHAR16 *)var, &owner,
+					      EFI_VARIABLE_NON_VOLATILE |
+					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
+					      EFI_VARIABLE_APPEND_WRITE,
+					      sizeof(sig), sig);
 	return efi_status;
 }

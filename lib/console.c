@@ -34,11 +34,8 @@ console_get_keystroke(EFI_INPUT_KEY *key)
 	UINTN EventIndex;
 	EFI_STATUS efi_status;
 
-	if (!ci)
-		return EFI_UNSUPPORTED;
-
 	do {
-		BS->WaitForEvent(1, &ci->WaitForKey, &EventIndex);
+		gBS->WaitForEvent(1, &ci->WaitForKey, &EventIndex);
 		efi_status = ci->ReadKeyStroke(ci, key);
 	} while (efi_status == EFI_NOT_READY);
 
@@ -112,8 +109,7 @@ console_print_at(UINTN col, UINTN row, const CHAR16 *fmt, ...)
 	if (!console_text_mode)
 		setup_console(1);
 
-	if (co)
-		co->SetCursorPosition(co, col, row);
+	co->SetCursorPosition(co, col, row);
 
 	ms_va_start(args, fmt);
 	ret = VPrint(fmt, args);
@@ -139,9 +135,6 @@ console_print_box_at(CHAR16 *str_arr[], int highlight,
 
 	if (!console_text_mode)
 		setup_console(1);
-
-	if (!co)
-		return;
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -248,9 +241,6 @@ console_print_box(CHAR16 *str_arr[], int highlight)
 	if (!console_text_mode)
 		setup_console(1);
 
-	if (!co)
-		return;
-
 	CopyMem(&SavedConsoleMode, co->Mode, sizeof(SavedConsoleMode));
 	co->EnableCursor(co, FALSE);
 	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
@@ -283,9 +273,6 @@ console_select(CHAR16 *title[], CHAR16* selectors[], unsigned int start)
 
 	if (!console_text_mode)
 		setup_console(1);
-
-	if (!co)
-		return -1;
 
 	co->QueryMode(co, co->Mode->Mode, &cols, &rows);
 
@@ -426,9 +413,6 @@ console_save_and_set_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
 		return;
 	}
 
-	if (!co)
-		return;
-
 	CopyMem(SavedMode, co->Mode, sizeof(SIMPLE_TEXT_OUTPUT_MODE));
 	co->EnableCursor(co, FALSE);
 	co->SetAttribute(co, EFI_LIGHTGRAY | EFI_BACKGROUND_BLUE);
@@ -438,9 +422,6 @@ void
 console_restore_mode(SIMPLE_TEXT_OUTPUT_MODE * SavedMode)
 {
 	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-
-	if (!co)
-		return;
 
 	co->EnableCursor(co, SavedMode->CursorVisible);
 	co->SetCursorPosition(co, SavedMode->CursorColumn,
@@ -459,9 +440,6 @@ console_countdown(CHAR16* title, const CHAR16* message, int timeout)
 	UINTN cols, rows;
 	CHAR16 *titles[2];
 	int wait = 10000000;
-
-	if (!co || !ci)
-		return -1;
 
 	console_save_and_set_mode(&SavedMode);
 
@@ -517,10 +495,7 @@ console_mode_handle(VOID)
 	UINTN rows = 0, columns = 0;
 	EFI_STATUS efi_status = EFI_SUCCESS;
 
-	if (!co)
-		return;
-
-	efi_status = BS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
+	efi_status = gBS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Locate graphic output protocol fail", efi_status);
 		return;
@@ -580,7 +555,7 @@ console_mode_handle(VOID)
 		efi_status = co->SetMode(co, mode_set);
 	}
 
-	clear_screen();
+	co->ClearScreen(co);
 
 	if (EFI_ERROR(efi_status)) {
 		console_error(L"Console set mode fail", efi_status);
@@ -674,25 +649,13 @@ console_reset(void)
 	if (!console_text_mode)
 		setup_console(1);
 
-	if (!co)
-		return;
-
 	co->Reset(co, TRUE);
 	/* set mode 0 - required to be 80x25 */
 	co->SetMode(co, 0);
 	co->ClearScreen(co);
 }
 
-void
-clear_screen(void)
-{
-	SIMPLE_TEXT_OUTPUT_INTERFACE *co = ST->ConOut;
-
-	if (!co)
-		return;
-
-	co->ClearScreen(co);
-}
+UINT32 verbose = 0;
 
 VOID
 setup_verbosity(VOID)
@@ -716,7 +679,7 @@ setup_verbosity(VOID)
 VOID
 msleep(unsigned long msecs)
 {
-	BS->Stall(msecs);
+	gBS->Stall(msecs);
 }
 
 /* This is used in various things to determine if we should print to the

@@ -33,9 +33,7 @@ get_active_systab(void)
 static typeof(systab->BootServices->LoadImage) system_load_image;
 static typeof(systab->BootServices->StartImage) system_start_image;
 static typeof(systab->BootServices->Exit) system_exit;
-#if !defined(DISABLE_EBS_PROTECTION)
 static typeof(systab->BootServices->ExitBootServices) system_exit_boot_services;
-#endif /* !defined(DISABLE_EBS_PROTECTION) */
 
 static EFI_HANDLE last_loaded_image;
 
@@ -47,10 +45,8 @@ unhook_system_services(void)
 
 	systab->BootServices->LoadImage = system_load_image;
 	systab->BootServices->StartImage = system_start_image;
-#if !defined(DISABLE_EBS_PROTECTION)
 	systab->BootServices->ExitBootServices = system_exit_boot_services;
-#endif /* !defined(DISABLE_EBS_PROTECTION) */
-	BS = systab->BootServices;
+	gBS = systab->BootServices;
 }
 
 static EFI_STATUS EFIAPI
@@ -61,8 +57,8 @@ load_image(BOOLEAN BootPolicy, EFI_HANDLE ParentImageHandle,
 	EFI_STATUS efi_status;
 
 	unhook_system_services();
-	efi_status = BS->LoadImage(BootPolicy, ParentImageHandle, DevicePath,
-				   SourceBuffer, SourceSize, ImageHandle);
+	efi_status = gBS->LoadImage(BootPolicy, ParentImageHandle, DevicePath,
+				    SourceBuffer, SourceSize, ImageHandle);
 	hook_system_services(systab);
 	if (EFI_ERROR(efi_status))
 		last_loaded_image = NULL;
@@ -81,7 +77,7 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 		loader_is_participating = 1;
 		uninstall_shim_protocols();
 	}
-	efi_status = BS->StartImage(image_handle, exit_data_size, exit_data);
+	efi_status = gBS->StartImage(image_handle, exit_data_size, exit_data);
 	if (EFI_ERROR(efi_status)) {
 		if (image_handle == last_loaded_image) {
 			EFI_STATUS efi_status2 = install_shim_protocols();
@@ -91,9 +87,9 @@ replacement_start_image(EFI_HANDLE image_handle, UINTN *exit_data_size, CHAR16 *
 					      efi_status2);
 				console_print(L"shim cannot continue, sorry.\n");
 				msleep(5000000);
-				RT->ResetSystem(EfiResetShutdown,
-						EFI_SECURITY_VIOLATION,
-						0, NULL);
+				gRT->ResetSystem(EfiResetShutdown,
+						 EFI_SECURITY_VIOLATION,
+						 0, NULL);
 			}
 		}
 		hook_system_services(systab);
@@ -110,7 +106,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 	    verification_method == VERIFIED_BY_HASH) {
 		unhook_system_services();
 		EFI_STATUS efi_status;
-		efi_status = BS->ExitBootServices(image_key, map_key);
+		efi_status = gBS->ExitBootServices(image_key, map_key);
 		if (EFI_ERROR(efi_status))
 			hook_system_services(systab);
 		return efi_status;
@@ -119,7 +115,7 @@ exit_boot_services(EFI_HANDLE image_key, UINTN map_key)
 	console_print(L"Bootloader has not verified loaded image.\n");
 	console_print(L"System is compromised.  halting.\n");
 	msleep(5000000);
-	RT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
+	gRT->ResetSystem(EfiResetShutdown, EFI_SECURITY_VIOLATION, 0, NULL);
 	return EFI_SECURITY_VIOLATION;
 }
 #endif /* !defined(DISABLE_EBS_PROTECTION) */
@@ -134,8 +130,8 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 
 	restore_loaded_image();
 
-	efi_status = BS->Exit(ImageHandle, ExitStatus,
-			      ExitDataSize, ExitData);
+	efi_status = gBS->Exit(ImageHandle, ExitStatus,
+			       ExitDataSize, ExitData);
 	if (EFI_ERROR(efi_status)) {
 		EFI_STATUS efi_status2 = shim_init();
 
@@ -144,8 +140,8 @@ do_exit(EFI_HANDLE ImageHandle, EFI_STATUS ExitStatus,
 				      efi_status2);
 			console_print(L"shim cannot continue, sorry.\n");
 			msleep(5000000);
-			RT->ResetSystem(EfiResetShutdown,
-					EFI_SECURITY_VIOLATION, 0, NULL);
+			gRT->ResetSystem(EfiResetShutdown,
+					 EFI_SECURITY_VIOLATION, 0, NULL);
 		}
 	}
 	return efi_status;
@@ -155,7 +151,7 @@ void
 hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 {
 	systab = local_systab;
-	BS = systab->BootServices;
+	gBS = systab->BootServices;
 
 	/* We need to hook various calls to make this work... */
 
@@ -185,15 +181,18 @@ hook_system_services(EFI_SYSTEM_TABLE *local_systab)
 void
 unhook_exit(void)
 {
+#if !defined(DISABLE_EBS_PROTECTION)
 	systab->BootServices->Exit = system_exit;
-	BS = systab->BootServices;
+	gBS = systab->BootServices;
+#endif /* defined(DISABLE_EBS_PROTECTION) */
+	return;
 }
 
 void
 hook_exit(EFI_SYSTEM_TABLE *local_systab)
 {
 	systab = local_systab;
-	BS = local_systab->BootServices;
+	gBS = local_systab->BootServices;
 
 	/* we need to hook Exit() so that we can allow users to quit the
 	 * bootloader and still e.g. start a new one or run an internal

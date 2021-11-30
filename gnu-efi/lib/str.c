@@ -211,7 +211,7 @@ StrDuplicate (
     Size = StrSize(Src);
     Dest = AllocatePool (Size);
     if (Dest) {
-        CopyMem (Dest, (void *)Src, Size);
+        CopyMem (Dest, Src, Size);
     }
     return Dest;
 }
