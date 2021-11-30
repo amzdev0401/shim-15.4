@@ -261,6 +261,9 @@ static const uint8_t null_sha256[32] = { 0, };
 
 typedef UINTN SIZE_T;
 
+#define EFI_MAJOR_VERSION(tablep) ((UINT16)((((tablep)->Hdr.Revision) >> 16) & 0xfffful))
+#define EFI_MINOR_VERSION(tablep) ((UINT16)(((tablep)->Hdr.Revision) & 0xfffful))
+
 static EFI_STATUS
 get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 {
@@ -270,11 +273,21 @@ get_max_var_sz(UINT32 attrs, SIZE_T *max_var_szp)
 	uint64_t max_var_sz = 0;
 
 	*max_var_szp = 0;
-	efi_status = gRT->QueryVariableInfo(attrs, &max_storage_sz,
-					    &remaining_sz, &max_var_sz);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get variable storage info: %r\n", efi_status);
-		return efi_status;
+	if (EFI_MAJOR_VERSION(gRT) < 2) {
+		dprint(L"EFI %d.%d; no RT->QueryVariableInfo().  Using 1024!\n",
+		       EFI_MAJOR_VERSION(gRT), EFI_MINOR_VERSION(gRT));
+		max_var_sz = remaining_sz = max_storage_sz = 1024;
+		efi_status = EFI_SUCCESS;
+	} else {
+		dprint(L"calling RT->QueryVariableInfo() at 0x%lx\n",
+		       gRT->QueryVariableInfo);
+		efi_status = gRT->QueryVariableInfo(attrs, &max_storage_sz,
+						    &remaining_sz, &max_var_sz);
+		if (EFI_ERROR(efi_status)) {
+			perror(L"Could not get variable storage info: %r\n",
+			       efi_status);
+			return efi_status;
+		}
 	}
 
 	/*
@@ -888,9 +901,6 @@ EFI_STATUS import_one_mok_state(struct mok_state_variable *v,
 	EFI_STATUS ret = EFI_SUCCESS;
 	EFI_STATUS efi_status;
 
-	user_insecure_mode = 0;
-	ignore_db = 0;
-
 	UINT32 attrs = 0;
 	BOOLEAN delete = FALSE;
 
@@ -1002,7 +1012,7 @@ EFI_STATUS import_mok_state(EFI_HANDLE image_handle)
 		npages = ALIGN_VALUE(config_sz, PAGE_SIZE) >> EFI_PAGE_SHIFT;
 		config_table = NULL;
 		efi_status = gBS->AllocatePages(AllocateAnyPages,
-						EfiRuntimeServicesData,
+						EfiBootServicesData,
 						npages,
 						(EFI_PHYSICAL_ADDRESS *)&config_table);
 		if (EFI_ERROR(efi_status) || !config_table) {
